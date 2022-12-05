@@ -1,9 +1,11 @@
 {
   "placeholders": {
-    "files": ["grid"]
+    "files": ["material-icons.css", "font-awesome.min.css"]
   },
-  "files": [
-
-    "./test-styles/external/material-icons.css"
+  "embed-font-files": [
+    {
+      "from": "./test-styles/external/{files}",
+      "to": "./test-styles/external/out_{files}"
+    }
   ]
 }

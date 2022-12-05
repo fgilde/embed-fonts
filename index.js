@@ -6,8 +6,6 @@ const defaultConfigFileName = 'embed-fonts.config.json';
 const shell = require("shelljs");
 const fs = require('fs');
 const path = require('path');
-const http = require('http');
-const https = require('https');
 const package = require('./package.json');
 var tools = require('./helper/tools');
 
@@ -91,29 +89,35 @@ function updateFontFaces(fileContent, options) {
 
 function processStylesheet(fileSrc, fileDest, options) {
     try {
-        console.log('Processing stylesheet "' + fileSrc + '"');
         if (!options.baseDir) {
             options.baseDir = path.dirname(fileSrc);
         }
         var fileContent = fs.readFileSync(fileSrc, 'utf8');
         fileContent = updateFontFaces(fileContent, options);
-        console.log(fileContent);
-        //grunt.file.write(fileDest, fileContent);
+        fs.writeFileSync(fileDest, fileContent);
     } catch (error) {
         console.error(error);
         console.warn('Processing stylesheet "' + fileSrc + '" failed\n');
     }
 }
 
+function _(str, asArray) { // replaces all placeholders in str
+    return tools._(config, str, asArray);
+}
+
+function spread(mappings) {
+    return tools.spread(config, mappings);
+}
+
+
 shell.exec(`echo ${package.name} v${package.version} started`);
 
 if (!config.mimeTypeOverrides) {
     config.mimeTypeOverrides = {};
 }
-config.files.forEach(file => {
-    var src = file;
-    var dest = file;
 
-    console.log(file.src[0], file.dest);
-    //processStylesheet(src, dest, config);
+var files = spread(config['embed-font-files']);
+files.forEach(file => {
+    console.log('Processing stylesheet from "' + file.from + '" to "' + file.to + '"');
+    processStylesheet(file.from, file.to, config);
 });
