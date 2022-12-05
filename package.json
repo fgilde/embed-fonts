@@ -1,6 +1,6 @@
 {
   "name": "@fgilde/embed-fonts",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Injects content of font files into stylesheets by replacing the relative url() paths with base64 encoded data.",
   "main": "index.js",
   "scripts": {
