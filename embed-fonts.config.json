@@ -4,6 +4,10 @@
   },
   "embed-font-files": [
     {
+      "from": "https://fonts.googleapis.com/css?family=Open+Sans:300,400,700",
+      "to": "./test-styles/external/my_local_open_sans_with_embedded_fonts.css"
+    },
+    {
       "from": "./test-styles/external/{files}",
       "to": "./test-styles/external/out_{files}"
     }

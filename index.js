@@ -7,6 +7,7 @@ const shell = require("shelljs");
 const fs = require('fs');
 const path = require('path');
 const package = require('./package.json');
+
 var tools = require('./helper/tools');
 
 const cfgFile = tools.fromCommandLineArg('config', argPrefix) || defaultConfigFileName;
@@ -25,13 +26,25 @@ var fontFace = /@font-face\s*\{[^\}]*}/g,
         woff2: 'font/woff2'
     };
 
-function getDataUri(fontFile, options) {
-    var typeMatchResult = fontType.exec(fontFile),
-        typeMatch = typeMatchResult[1].toLowerCase(),
-        //faceContent = grunt.file.read(fontFile, {encoding: null}),
-        faceContent = fs.readFileSync(fontFile),
+async function getDataUriAsync(file, options) {
+    if(file.toLowerCase().startsWith('http')) {
+        const data = await tools.readBufferFromUrl(file);
+        if (data) {
+            return await getDataUriForContentAsync(data, fontType.exec(file), options);
+        } else {
+            return file;
+        }
+    } else {
+        return await getDataUriForFile(file, options);
+    }
+}
+
+async function getDataUriForContentAsync(faceContent, typeMatchResult, options) {
+    var typeMatch = typeMatchResult[1].toLowerCase(),
+        fontEncoded,
         fontEncoded = faceContent.toString('base64'),
         fontMimeType = options.mimeTypeOverrides[typeMatch];
+
     if (!fontMimeType) {
         if (options.fontMimeType) {
             fontMimeType = 'font/' + typeMatch;
@@ -41,63 +54,64 @@ function getDataUri(fontFile, options) {
             fontMimeType = fontMimeTypes[typeMatch];
         }
     }
-    console.log('Embedding "' + fontFile + '" as "' + fontMimeType + '".');
+
     return 'data:' + fontMimeType + ';base64,' + fontEncoded;
 }
 
-function embedFontUrls(faceContent, options) {
+async function getDataUriForFile(fontFile, options) {
+    return await getDataUriForContentAsync(fs.readFileSync(fontFile), fontType.exec(fontFile), options);
+}
 
-    var isMatchingFile = function (fontFile, fileNameRegExps) {
-        return fileNameRegExps.some(function (fileNameRegExp) {
-            return fontFile.match(fileNameRegExp);
-        });
-    };
-
-    var urlMatch;
-    var mimeTypes;
-    var currentFontUrl = fontUrl;
+async function embedFontUrlsAsync(faceContent, options) {
+    var isMatchingFile = (fontFile, fileNameRegExps) => fileNameRegExps.some((fileNameRegExp) => fontFile.match(fileNameRegExp)),
+        urlMatch,
+        mimeTypes,
+        currentFontUrl = fontUrl;
     if (options.applyTo) {
         mimeTypes = options.applyTo.join('|');
         currentFontUrl = new RegExp("url\\([\"']?(?!\\/\\/)([^\\?#\"'\\)]+\\.(?:" + mimeTypes + "))((?:\\?[^#\"'\\)]*)?(?:#[^\"'\\)]*))?[\"']?\\)", "ig");
     }
+
     while ((urlMatch = currentFontUrl.exec(faceContent))) {
-        var fontFile = urlMatch[1];
-        if (fontFile.indexOf(':') < 0) {
-            if (!path.isAbsolute(fontFile)) {
+        let fontFile = urlMatch[1];
+        if (fontFile.indexOf(':') < 0 || fontFile.toLowerCase().startsWith('http')) {
+            if (!path.isAbsolute(fontFile) && !fontFile.toLowerCase().startsWith('http')) {
                 fontFile = path.join(options.baseDir, fontFile);
             }
             if (!options.only || isMatchingFile(fontFile, options.only)) {
-                var fontAnchor = urlMatch[2] || '',
-                    fontEmbedded = 'url("' + getDataUri(fontFile, options) + fontAnchor + '")';
-                faceContent = faceContent.substr(0, urlMatch.index) + fontEmbedded +
-                    faceContent.substr(urlMatch.index + urlMatch[0].length);
+                const result = await getDataUriAsync(fontFile, options);
+                faceContent = faceContent.replace(urlMatch[0], 'url(' + result + ')');
             }
         }
     }
     return faceContent;
 }
 
-function updateFontFaces(fileContent, options) {
-    var faceMatch;
+async function updateFontFacesAsync(fileContent, options) {
+    let faceMatch;
     while ((faceMatch = fontFace.exec(fileContent))) {
-        var faceContent = embedFontUrls(faceMatch[0], options);
-        fileContent = fileContent.substr(0, faceMatch.index) + faceContent +
-            fileContent.substr(faceMatch.index + faceMatch[0].length);
+        const faceContent = await embedFontUrlsAsync(faceMatch[0], options);
+        fileContent = fileContent.replace(faceMatch[0], faceContent);
     }
     return fileContent;
 }
 
-function processStylesheet(fileSrc, fileDest, options) {
-    try {
-        if (!options.baseDir) {
-            options.baseDir = path.dirname(fileSrc);
-        }
-        var fileContent = fs.readFileSync(fileSrc, 'utf8');
-        fileContent = updateFontFaces(fileContent, options);
-        fs.writeFileSync(fileDest, fileContent);
-    } catch (error) {
-        console.error(error);
-        console.warn('Processing stylesheet "' + fileSrc + '" failed\n');
+async function processStylesheet(fileSrc, fileDest, options) {
+    if (!options.baseDir && !fileSrc.toLowerCase().startsWith('http')) {
+        options.baseDir = path.dirname(fileSrc);
+    }
+
+    let content = fileSrc.toLowerCase().startsWith('http')
+        ? await tools.readStringFromUrlAsync(fileSrc)
+        : await fs.readFileSync(fileSrc, 'utf8');
+    content = await updateFontFacesAsync(content, options);
+    fs.writeFileSync(fileDest, content);
+}
+
+async function run(files) {
+    for (const file of files) {
+        console.log('Processing stylesheet from "' + file.from + '" to "' + file.to + '"');
+        await processStylesheet(file.from, file.to, config);
     }
 }
 
@@ -117,7 +131,6 @@ if (!config.mimeTypeOverrides) {
 }
 
 var files = spread(config['embed-font-files']);
-files.forEach(file => {
-    console.log('Processing stylesheet from "' + file.from + '" to "' + file.to + '"');
-    processStylesheet(file.from, file.to, config);
-});
+run(files).then(() => console.log(`DONE !!`) );
+
+

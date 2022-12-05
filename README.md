@@ -71,7 +71,26 @@ Because this tool uses same config as [remote-dependencies](https://www.npmjs.co
 And you can use the same placeholders in both tools. 
 In combination of both tools you can download remote css, and font files and inject them into your stylesheets with fully embedded style.
 
-
+### Useful use case
+This tool is very useful if you want to use a css with fonts from a CDN.
+In this we use two local files ("material-icons.css", "font-awesome.min.css") with containing local fonts from `./test-styles/external` and the Open Sans font from fonts.googleapis.com
+```json
+{
+  "placeholders": {
+    "files": ["material-icons.css", "font-awesome.min.css"]
+  },
+  "embed-font-files": [
+    {
+      "from": "https://fonts.googleapis.com/css?family=Open+Sans:300,400,700",
+      "to": "./test-styles/external/my_local_open_sans_with_embedded_fonts.css"
+    },
+    {
+      "from": "./test-styles/external/{files}",
+      "to": "./test-styles/external/out_{files}"
+    }
+  ]
+}
+```
 
 
 ### If you like this tool, please star it on [Github](https://github.com/fgilde/embed-fonts)  and share it with your friends

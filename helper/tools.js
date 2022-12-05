@@ -1,5 +1,7 @@
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+const https = require('https');
 
 module.exports = {
     _: function (config, str, asArray) { // replaces all placeholders in str
@@ -37,6 +39,32 @@ module.exports = {
         });
         //console.log(result); return [];
         return result;
+    },
+
+    readBufferFromUrl: function (url) {
+        return new Promise((resolve, reject) => {
+            let client = url.toLowerCase().startsWith('https') ? https : http;
+            try {
+                client.get(url, (resp) => {
+                    let data = [];
+                    resp.on('data', (chunk) => {
+                        data.push(chunk);
+                    });
+                    resp.on('end', () => {
+                        resolve(Buffer.concat(data));
+                    });
+                }).on("error", (err) => {
+                    reject(err);
+                });
+            } catch (error) {
+                reject(error);
+            }
+        });
+    },
+
+    readStringFromUrlAsync: async function (url) {
+        const buffer = await this.readBufferFromUrl(url);
+        return buffer.toString();
     },
 
     ensureFile: function (fileName, suggestedName) {
