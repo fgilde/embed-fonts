@@ -1,0 +1,9 @@
+{
+  "placeholders": {
+    "files": ["grid"]
+  },
+  "files": [
+
+    "./test-styles/external/material-icons.css"
+  ]
+}
