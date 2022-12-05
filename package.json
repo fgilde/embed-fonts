@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "run",
-    "patch-release": "npm version patch && npm publish && git push --follow-tags"
+    "patch-release": "npm version patch && npm publish --access public && git push --follow-tags"
   },
   "bin": {
     "embed-fonts": "index.js"
