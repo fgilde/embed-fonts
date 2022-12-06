@@ -1,15 +1,20 @@
 {
   "placeholders": {
-    "files": ["material-icons.css", "font-awesome.min.css"]
+    "localDir": "./test-styles/external",
+    "files": [
+      "https://s3-shared.labs.sabio.de/nomad-sandbox-team-lego-public/styles/5.3.2/default-theme.css",
+      "https://unpkg.com/material-components-web@4.0.0/dist/material-components-web.min.css",
+      "https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css",
+      "https://fonts.googleapis.com/icon?family=Material+Icons",
+      "https://fonts.googleapis.com/css?family=Open+Sans:300,400,700"
+    ]
   },
-  "embed-font-files": [
+  "bundledOutputFile" : "{localDir}/_all_bundle.css",
+  "mappings": [
     {
-      "from": "https://fonts.googleapis.com/css?family=Open+Sans:300,400,700",
-      "to": "./test-styles/external/my_local_open_sans_with_embedded_fonts.css"
-    },
-    {
-      "from": "./test-styles/external/{files}",
-      "to": "./test-styles/external/out_{files}"
+      "minify": true,
+      "from": "{files}",
+      "to": "{localDir}"
     }
   ]
 }

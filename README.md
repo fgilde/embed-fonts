@@ -1,5 +1,7 @@
 # Embed-Fonts
 Injects content of font files into stylesheets by replacing the relative url() paths with base64 encoded data.
+With this tool you can easily embed fonts or include complete remote css with embedded fonts.
+You can use it for example as small helper for embedding Google Fonts onto your page with as less effort as possible.
 
 ### Step 1 Install package
 
@@ -87,6 +89,54 @@ In this we use two local files ("material-icons.css", "font-awesome.min.css") wi
     {
       "from": "./test-styles/external/{files}",
       "to": "./test-styles/external/out_{files}"
+    }
+  ]
+}
+```
+
+You can also completely use remote files.
+Here we create local usable styles for each of material-components-web.min.css, font-awesome.min.css, Material+Icons adn Open+Sans
+This produces the 4 output files `css_family_open_sans_300_400_700.css, font_awesome_min_css.css, icon_family_material_icons.css, material_components_web_min_css.css`
+
+```json
+{
+  "placeholders": {
+    "localDir": "./test-styles/external",
+    "files": [
+      "https://unpkg.com/material-components-web@4.0.0/dist/material-components-web.min.css",
+      "https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css",
+      "https://fonts.googleapis.com/icon?family=Material+Icons",
+      "https://fonts.googleapis.com/css?family=Open+Sans:300,400,700"
+    ]
+  },
+  "mappings": [
+    {
+      "minify": true, // Set this to true to minify the output
+      "from": "{files}",
+      "to": "{localDir}"
+    }
+  ]
+}
+```
+If you dont want to have a file foreach input, you can also bundle all mappings into one file.
+
+```json
+{
+  "placeholders": {
+    "localDir": "./test-styles/external",
+    "files": [
+      "https://unpkg.com/material-components-web@4.0.0/dist/material-components-web.min.css",
+      "https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css",
+      "https://fonts.googleapis.com/icon?family=Material+Icons",
+      "https://fonts.googleapis.com/css?family=Open+Sans:300,400,700"
+    ]
+  },
+  "bundledOutputFile" : "{localDir}/_all_bundle.css", // bundle all to one file
+  "mappings": [
+    {
+      "minify": true, // Set this to true to minify the output
+      "from": "{files}"
+      // dont provide a to, so the output will be bundled into the bundledOutputFile only
     }
   ]
 }

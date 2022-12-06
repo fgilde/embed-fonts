@@ -26,6 +26,8 @@
   "author": "Florian Gilde",
   "license": "GPL-3.0",
   "dependencies": {
+    "clean-css": "^5.3.1",
+    "file-type": "^18.0.0",
     "shelljs": "^0.8.5"
   },
   "bugs": {

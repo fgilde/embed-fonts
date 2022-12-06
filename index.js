@@ -7,7 +7,7 @@ const shell = require("shelljs");
 const fs = require('fs');
 const path = require('path');
 const package = require('./package.json');
-
+const CleanCSS  = require('clean-css');
 var tools = require('./helper/tools');
 
 const cfgFile = tools.fromCommandLineArg('config', argPrefix) || defaultConfigFileName;
@@ -15,6 +15,7 @@ const config = JSON.parse(fs.readFileSync(cfgFile));
 console.log(config);
 
 var fontFace = /@font-face\s*\{[^\}]*}/g,
+    allUrl = /url\(['"]?([^)'"]*)['"]?\)/ig,
     fontUrl = /url\(["']?(?!\/\/)([^\?#"'\)]+\.(?:eot|svg|ttf|otf|woff|woff2))((?:\?[^#"'\)]*)?(?:#[^"'\)]*))?["']?\)/ig,
     fontType = /\.((?:[a-zA-Z]+)2?)$/,
     fontMimeTypes = {
@@ -30,7 +31,8 @@ async function getDataUriAsync(file, options) {
     if(file.toLowerCase().startsWith('http')) {
         const data = await tools.readBufferFromUrl(file);
         if (data) {
-            return await getDataUriForContentAsync(data, fontType.exec(file), options);
+            var filewithRemovedQuery = file.split('?')[0];
+            return await getDataUriForContentAsync(data, fontType.exec(filewithRemovedQuery), options);
         } else {
             return file;
         }
@@ -44,14 +46,13 @@ async function getDataUriForContentAsync(faceContent, typeMatchResult, options) 
         fontEncoded,
         fontEncoded = faceContent.toString('base64'),
         fontMimeType = options.mimeTypeOverrides[typeMatch];
-
     if (!fontMimeType) {
         if (options.fontMimeType) {
             fontMimeType = 'font/' + typeMatch;
         } else if (options.xFontMimeType) {
             fontMimeType = 'application/x-font-' + typeMatch;
         } else {
-            fontMimeType = fontMimeTypes[typeMatch];
+            fontMimeType = fontMimeTypes[typeMatch] || (await tools.mimeTypeForContent(faceContent)) || 'application/octet-stream';
         }
     }
 
@@ -62,11 +63,11 @@ async function getDataUriForFile(fontFile, options) {
     return await getDataUriForContentAsync(fs.readFileSync(fontFile), fontType.exec(fontFile), options);
 }
 
-async function embedFontUrlsAsync(faceContent, options) {
+async function embedFontUrlsAsync(fileSrc, faceContent, options) {
     var isMatchingFile = (fontFile, fileNameRegExps) => fileNameRegExps.some((fileNameRegExp) => fontFile.match(fileNameRegExp)),
         urlMatch,
         mimeTypes,
-        currentFontUrl = fontUrl;
+        currentFontUrl = allUrl;
     if (options.applyTo) {
         mimeTypes = options.applyTo.join('|');
         currentFontUrl = new RegExp("url\\([\"']?(?!\\/\\/)([^\\?#\"'\\)]+\\.(?:" + mimeTypes + "))((?:\\?[^#\"'\\)]*)?(?:#[^\"'\\)]*))?[\"']?\\)", "ig");
@@ -76,7 +77,15 @@ async function embedFontUrlsAsync(faceContent, options) {
         let fontFile = urlMatch[1];
         if (fontFile.indexOf(':') < 0 || fontFile.toLowerCase().startsWith('http')) {
             if (!path.isAbsolute(fontFile) && !fontFile.toLowerCase().startsWith('http')) {
-                fontFile = path.join(options.baseDir, fontFile);
+                try
+                {
+                    fontFile = path.join(options.baseDir, fontFile);
+                }
+                catch (e) {
+                    // Font file is maybe relative to remote stylesheet
+                    fontFile = tools.combineUrl(fileSrc, fontFile);
+                    console.log('Font file is maybe relative to remote stylesheet: ' + fontFile);
+                }
             }
             if (!options.only || isMatchingFile(fontFile, options.only)) {
                 const result = await getDataUriAsync(fontFile, options);
@@ -87,16 +96,22 @@ async function embedFontUrlsAsync(faceContent, options) {
     return faceContent;
 }
 
-async function updateFontFacesAsync(fileContent, options) {
+async function updateFontFacesAsync(fileSrc, fileContent, options) {
     let faceMatch;
     while ((faceMatch = fontFace.exec(fileContent))) {
-        const faceContent = await embedFontUrlsAsync(faceMatch[0], options);
+        const faceContent = await embedFontUrlsAsync(fileSrc, faceMatch[0], options);
         fileContent = fileContent.replace(faceMatch[0], faceContent);
     }
     return fileContent;
 }
 
-async function processStylesheet(fileSrc, fileDest, options) {
+async function processStylesheet(file, options) {
+    const fileSrc = file.from;
+    const fileDest = file.to;
+    const minify = file.minify !== undefined ? file.minify : options.minify;
+    const bundle = options.bundledOutputFile ? _(options.bundledOutputFile) : null;
+    console.log('Processing stylesheet from "' + fileSrc + '" to "' + fileDest + '"');
+
     if (!options.baseDir && !fileSrc.toLowerCase().startsWith('http')) {
         options.baseDir = path.dirname(fileSrc);
     }
@@ -104,14 +119,32 @@ async function processStylesheet(fileSrc, fileDest, options) {
     let content = fileSrc.toLowerCase().startsWith('http')
         ? await tools.readStringFromUrlAsync(fileSrc)
         : await fs.readFileSync(fileSrc, 'utf8');
-    content = await updateFontFacesAsync(content, options);
-    fs.writeFileSync(fileDest, content);
+    content = await updateFontFacesAsync(fileSrc, content, options);
+
+    (Array.isArray(fileDest) ? fileDest : [fileDest]).forEach(to => {
+        (_(to, true) || [null]).forEach(f => {
+            if (minify) {
+                content = new CleanCSS().minify(content).styles;
+            }
+            if (bundle) {
+                fs.appendFileSync(bundle, content);
+            }
+            if (f) {
+                const fileName = tools.ensureFile(f, tools.urlAsFileName(path.basename(fileSrc)));
+                fs.writeFileSync(fileName, content);
+            }
+        });
+    });
 }
 
 async function run(files) {
+    const bundle = config.bundledOutputFile ? _(config.bundledOutputFile) : null;
+    if (bundle) {
+        fs.writeFileSync(tools.ensureFile(bundle), '');
+    }
+
     for (const file of files) {
-        console.log('Processing stylesheet from "' + file.from + '" to "' + file.to + '"');
-        await processStylesheet(file.from, file.to, config);
+        await processStylesheet(file, config);
     }
 }
 
@@ -130,7 +163,7 @@ if (!config.mimeTypeOverrides) {
     config.mimeTypeOverrides = {};
 }
 
-var files = spread(config['embed-font-files']);
+var files = spread(config['embed-font-files'] || config['mappings']);
 run(files).then(() => console.log(`DONE !!`) );
 
 
