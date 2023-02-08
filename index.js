@@ -8,10 +8,16 @@ const fs = require('fs');
 const path = require('path');
 const package = require('./package.json');
 const CleanCSS  = require('clean-css');
-var tools = require('./helper/tools');
+const tools = require('./helper/tools');
 
 const cfgFile = tools.fromCommandLineArg('config', argPrefix) || defaultConfigFileName;
 const config = JSON.parse(fs.readFileSync(cfgFile));
+
+if(config && config.skipCertificateCheck) {
+    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
+//process.env.NODE_TLS_REJECT_UNAUTHORIZED='0'
+}
+
 console.log(config);
 
 var fontFace = /@font-face\s*\{[^\}]*}/g,
@@ -162,6 +168,9 @@ shell.exec(`echo ${package.name} v${package.version} started`);
 if (!config.mimeTypeOverrides) {
     config.mimeTypeOverrides = {};
 }
+
+//console.log('Config: ' + JSON.stringify(config, null, 2));
+
 
 var files = spread(config['embed-font-files'] || config['mappings']);
 run(files).then(() => console.log(`DONE !!`) );
