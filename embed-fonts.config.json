@@ -3,7 +3,7 @@
   "placeholders": {
     "localDir": "./test-styles/external",
     "files": [
-      "https://s3-shared.labs.sabio.de/nomad-sandbox-team-lego-public/styles/5.3.2/default-theme.css",
+      "./node_modules/@sw/angular-controls/assets/styles/themes/default-theme.css",
       "https://unpkg.com/material-components-web@4.0.0/dist/material-components-web.min.css",
       "https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css",
       "https://fonts.googleapis.com/icon?family=Material+Icons",

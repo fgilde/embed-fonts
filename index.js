@@ -85,7 +85,7 @@ async function embedFontUrlsAsync(fileSrc, faceContent, options) {
             if (!path.isAbsolute(fontFile) && !fontFile.toLowerCase().startsWith('http')) {
                 try
                 {
-                    fontFile = path.join(options.baseDir, fontFile);
+                    fontFile = path.join(options.currentBaseDir, fontFile);
                 }
                 catch (e) {
                     // Font file is maybe relative to remote stylesheet
@@ -118,9 +118,7 @@ async function processStylesheet(file, options) {
     const bundle = options.bundledOutputFile ? _(options.bundledOutputFile) : null;
     console.log('Processing stylesheet from "' + fileSrc + '" to "' + fileDest + '"');
 
-    if (!options.baseDir && !fileSrc.toLowerCase().startsWith('http')) {
-        options.baseDir = path.dirname(fileSrc);
-    }
+    options.currentBaseDir = options.baseDir ?? fileSrc.toLowerCase().startsWith('http') ? undefined : path.dirname(fileSrc);
 
     let content = fileSrc.toLowerCase().startsWith('http')
         ? await tools.readStringFromUrlAsync(fileSrc)
@@ -150,6 +148,7 @@ async function run(files) {
     }
 
     for (const file of files) {
+        config.currentBaseDir = undefined; // Reset baseDir for each file
         await processStylesheet(file, config);
     }
 }
